@@ -12,9 +12,9 @@ export default defineConfig({
       components: {
         Footer: './src/components/CustomFooter.astro',
       },
-      social: {
-        github: 'https://github.com/neil-jay/sjrslms',
-      },
+      social: [
+        { label: 'GitHub', href: 'https://github.com/neil-jay/sjrslms', icon: 'github' },
+      ],
       sidebar: [
         {
           label: 'Getting Started',
