@@ -149,7 +149,164 @@ curl -X POST "https://sjrslms.jeevs.workers.dev/api/auth/sessions/cleanup" \
   -H "Authorization: Bearer ADMIN_JWT_TOKEN"
 ```
 
-## 📝 Validation Issues
+## � Account Status & Email Verification Issues
+
+### **Issue: Account Inactive Error (Error 5013)**
+
+#### **Symptoms**
+```json
+{
+  "success": false,
+  "error": "Your account is inactive. Please reverify your email to reactivate your account.",
+  "code": "USER_INACTIVE"
+}
+```
+
+#### **Causes**
+1. **Auto-deactivation:** Account pending for 45+ days without email verification
+2. **Manual deactivation:** Admin manually deactivated the account
+3. **Email never verified:** User registered but never clicked verification link
+
+#### **Solutions Based on Account State**
+
+##### **Case 1: Email Already Verified**
+If you previously verified your email but account was auto-deactivated:
+
+```bash
+# Simply attempt to log in again - you'll be routed to complete your profile
+curl -X POST "https://sjrslms.jeevs.workers.dev/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "yourpassword"
+  }'
+
+# Response will include requiresProfileCompletion flag
+# You'll be redirected to /profile-completion to finish onboarding
+```
+
+**Recovery Path (Added 2026-03-02):**
+- ✅ Accounts with `email_verified=true` can now log in even if status is `inactive`
+- ✅ You'll be prompted to complete your profile
+- ✅ After profile completion, admin will review and activate your account
+
+##### **Case 2: Email Not Verified**
+If you never verified your email:
+
+```bash
+# Resend confirmation email
+curl -X POST "https://sjrslms.jeevs.workers.dev/api/auth/resend-confirmation" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com"
+  }'
+
+# Check your email and click the verification link
+# Then log in and complete your profile
+```
+
+#### **Prevention**
+- ✅ Verify email within 45 days of registration
+- ✅ Complete profile immediately after email verification
+- ✅ Log in at least once to prevent auto-deactivation
+
+### **Issue: Email Not Confirmed (Error Code: EMAIL_NOT_CONFIRMED)**
+
+#### **Symptoms**
+```json
+{
+  "success": false,
+  "error": "Email not confirmed",
+  "code": "EMAIL_NOT_CONFIRMED"
+}
+```
+
+#### **Solutions**
+```bash
+# 1. Check your email inbox and spam folder for verification link
+# Subject: "Verify Your Email - SJRS Library Management System"
+
+# 2. If email not received, request a new confirmation email
+curl -X POST "https://sjrslms.jeevs.workers.dev/api/auth/resend-confirmation" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com"
+  }'
+
+# 3. Click the verification link in the email
+# Link format: https://sjrslms.jeevs.workers.dev/email-confirmation?token=VERIFICATION_TOKEN
+
+# 4. After verification, log in to complete your profile
+```
+
+### **Issue: Pending Approval (Error Code: PENDING_APPROVAL)**
+
+#### **Symptoms**
+```json
+{
+  "success": false,
+  "error": "Account is not active yet. Awaiting admin approval.",
+  "code": "PENDING_APPROVAL"
+}
+```
+
+#### **Explanation**
+This is **not an error** - your account is in the approval queue:
+- ✅ Email verified
+- ✅ Profile completed
+- ⏳ Waiting for admin to approve your account
+
+#### **What's Next**
+- Admin will review your profile within 24-48 hours
+- You'll receive an email when your account is approved
+- No action needed from you - just wait for approval
+
+#### **If Urgent**
+Contact library administration:
+- Email: library@sjrslibrary.edu
+- Phone: +91-XXXX-XXXXX
+
+### **Issue: Account Suspended (Error Code: ACCOUNT_SUSPENDED)**
+
+#### **Symptoms**
+```json
+{
+  "success": false,
+  "error": "Account is suspended",
+  "code": "ACCOUNT_SUSPENDED"
+}
+```
+
+#### **Causes**
+- Policy violations (e.g., repeated overdue books)
+- Terms of service violations
+- Admin-initiated suspension
+
+#### **Solutions**
+**Contact library administration immediately:**
+- Email: library@sjrslibrary.edu
+- Include your account email and reason for contact
+
+### **Account Lifecycle Reference**
+
+| Account Status | Email Verified | Profile Complete | Can Login? | Next Action |
+|----------------|----------------|------------------|------------|-------------|
+| `pending` | ❌ No | ❌ No | ❌ No | Verify email |
+| `pending` | ✅ Yes | ❌ No | ✅ Yes* | Complete profile |
+| `pending` | ✅ Yes | ✅ Yes | ❌ No | Wait for admin approval |
+| `inactive` | ❌ No | Any | ❌ No | Resend verification email |
+| `inactive` | ✅ Yes | ❌ No | ✅ Yes* | Complete profile (recovery) |
+| `inactive` | ✅ Yes | ✅ Yes | ✅ Yes* | Contact admin for reactivation |
+| `active` | ✅ Yes | ✅ Yes | ✅ Yes | Full access |
+| `suspended` | Any | Any | ❌ No | Contact admin |
+
+*Allowed as of 2026-03-02 update - recovery path for email-verified accounts
+
+**Related Documentation:**
+- [Auth Flow - Login Validation & Account Lifecycle](/development/auth-flow#login-validation--account-lifecycle)
+- [Profile Completion UX](/development/profile-completion-ux-proposal)
+
+## �📝 Validation Issues
 
 ### **Issue: Missing Required Fields**
 
